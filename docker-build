@@ -1,0 +1,2 @@
+#!/bin/bash
+docker build -t os64-build-env:latest .
