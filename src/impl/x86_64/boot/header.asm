@@ -5,10 +5,12 @@ header_start:
     dd header_end - header_start ; header len
     dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start)) ; cksum
 
-    ;end tag
+
+    ; End tag
     dw 0
     dw 0
     dd 8
+
 
 header_end:
 
