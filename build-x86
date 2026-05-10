@@ -1,0 +1,2 @@
+#!/bin/bash
+docker run --rm -v $(pwd):/root/env os64-build-env:latest make all
