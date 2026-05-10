@@ -3,7 +3,7 @@ global start, longmode_message
 extern long_mode_start
 
 extern framebuffer_addr,framebuffer_addr2,framebuffer_width,framebuffer_height
-extern framebuffer_depth
+extern framebuffer_depth, framebuffer_pitch
 
 extern serial_write, serial_write_char
 extern serial_init
@@ -24,8 +24,10 @@ start:
     call check_long_mode
     
     call setup_page_tables
+
     call enable_paging
 
+    call enable_fpu
 
     ; Print " Entering 64bit mode"
     mov esi, longmode_message          
@@ -39,6 +41,25 @@ start:
     ;mov dword [0xb8000], 0x2f4b2f4f
     hlt
 
+enable_fpu:
+    pusha
+    pushf
+
+    ; Enable FPU (x87) in early boot code
+    mov eax, cr0
+    and eax, 0xFFFFFFFB      ; Clear EM (bit 2) - disable emulation
+    or  eax, 0x00000022      ; Set MP (bit 1) and NE (bit 5)
+    mov cr0, eax
+
+    mov eax, cr4
+    or  eax, 0x00000600      ; Set OSFXSR and OSXMMEXCPT (bits 9 and 10)
+    mov cr4, eax
+    
+    popf
+    popa
+
+    ret
+    
 check_multiboot:
     
     push eax         
@@ -193,8 +214,8 @@ check_multiboot:
     add esp, 4
 
 
-    mov eax, [edi + 16]         ; Load framebuffer physical address upper 32 bits
-    mov dword [framebuffer_addr2], eax
+    mov eax, [edi + 16]         ; Load framebuffer pitch
+    mov dword [framebuffer_pitch], eax
 
     push eax
     call print_hex_serial       ; Print framebuffer pitch
@@ -246,12 +267,12 @@ check_multiboot:
     add esp, 4
 
 
-%if 1
+%if 1 ;test writing to the framebuffer
     mov ecx,0x10ffff
 .l2
     mov eax, ecx
     and eax,0xFFFF
-    ;mov dword [0xfd000000+ecx*4], eax
+    ;mov dword [framebuffer_addr+ecx*4], eax ; in qemu this is 0xfd000000
     loop .l2
 %endif 
 

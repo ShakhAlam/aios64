@@ -1,8 +1,84 @@
 #include "print.h"
+
+
+//#include <stdint.h>
+
+#define PI 3.141592653589793
+#define TWO_PI 6.283185307179586
+
+double cosine(double x) {
+    // Normalize x to range [-PI, PI]
+    while (x > PI)  x -= TWO_PI;
+    while (x < -PI) x += TWO_PI;
+
+    double term = 1.0;
+    double sum = 1.0;
+    double x2 = x * x;
+
+    for (int i = 1; i <= 10; ++i) {
+        term *= -x2 / ((2 * i - 1) * (2 * i));
+        sum += term;
+    }
+
+    return sum;
+}
+
+
+#define DEG_TO_RAD (PI / 180.0)
+
+static const double cos_lut[360] = {
+    1.000000, 0.999848, 0.999391, 0.998630, 0.997564, 0.996195, 0.994522, 0.992546, 0.990268, 0.987688,
+    0.984808, 0.981627, 0.978148, 0.974370, 0.970296, 0.965926, 0.961262, 0.956305, 0.951057, 0.945519,
+    0.939693, 0.933580, 0.927184, 0.920505, 0.913545, 0.906308, 0.898794, 0.891007, 0.882948, 0.874620,
+    0.866025, 0.857167, 0.848048, 0.838671, 0.829038, 0.819152, 0.809017, 0.798636, 0.788011, 0.777146,
+    0.766044, 0.754710, 0.743145, 0.731354, 0.719340, 0.707107, 0.694658, 0.681998, 0.669131, 0.656059,
+    0.642788, 0.629321, 0.615661, 0.601815, 0.587785, 0.573576, 0.559193, 0.544639, 0.529919, 0.515038,
+    0.500000, 0.484810, 0.469472, 0.453990, 0.438371, 0.422618, 0.406737, 0.390731, 0.374607, 0.358368,
+    0.342020, 0.325568, 0.309017, 0.292372, 0.275637, 0.258819, 0.241921, 0.224951, 0.207912, 0.190809,
+    0.173648, 0.156434, 0.139173, 0.121869, 0.104528, 0.087156, 0.069756, 0.052336, 0.034899, 0.017452,
+    0.000000, -0.017452, -0.034899, -0.052336, -0.069756, -0.087156, -0.104528, -0.121869, -0.139173, -0.156434,
+    -0.173648, -0.190809, -0.207912, -0.224951, -0.241921, -0.258819, -0.275637, -0.292372, -0.309017, -0.325568,
+    -0.342020, -0.358368, -0.374607, -0.390731, -0.406737, -0.422618, -0.438371, -0.453990, -0.469472, -0.484810,
+    -0.500000, -0.515038, -0.529919, -0.544639, -0.559193, -0.573576, -0.587785, -0.601815, -0.615661, -0.629321,
+    -0.642788, -0.656059, -0.669131, -0.681998, -0.694658, -0.707107, -0.719340, -0.731354, -0.743145, -0.754710,
+    -0.766044, -0.777146, -0.788011, -0.798636, -0.809017, -0.819152, -0.829038, -0.838671, -0.848048, -0.857167,
+    -0.866025, -0.874620, -0.882948, -0.891007, -0.898794, -0.906308, -0.913545, -0.920505, -0.927184, -0.933580,
+    -0.939693, -0.945519, -0.951057, -0.956305, -0.961262, -0.965926, -0.970296, -0.974370, -0.978148, -0.981627,
+    -0.984808, -0.987688, -0.990268, -0.992546, -0.994522, -0.996195, -0.997564, -0.998630, -0.999391, -0.999848
+};
+
+double cosine_lut(double x) {
+    // Normalize x to [0, TWO_PI)
+    while (x < 0)        x += TWO_PI;
+    while (x >= TWO_PI)  x -= TWO_PI;
+
+    int degree = (int)(x * (180.0 / PI));  // Convert radians to degrees
+    if (degree >= 360) degree = 0;
+
+    return cos_lut[degree];
+}
+
+/*
+void putpixel(uint32_t x, uint32_t y, uint32_t color, 
+              uint8_t* framebuffer_addr, uint32_t pitch) {
+    uint32_t* pixel = (uint32_t*)(framebuffer_addr + y * pitch + x * 4);
+    *pixel = color;
+}*/
+
+void putpixel(unsigned int x, unsigned int y, unsigned int color,
+    unsigned char* framebuffer_addr, unsigned int pitch) {
+unsigned int offset = y * pitch + x * 4;
+unsigned int* pixel = (unsigned int*)(framebuffer_addr + offset);
+*pixel = color;
+}
+
+
+
 extern unsigned long framebuffer_addr,
                      framebuffer_width,
                      framebuffer_height,
-                     framebuffer_depth;
+                     framebuffer_depth,
+                     framebuffer_pitch;
 
 void write_serial(char c) {
     __asm__ volatile (
@@ -45,11 +121,15 @@ void hexprint_serial(unsigned long n){
     write_serial((char)'\n');
 }
 
+
 void kernel_main(){
 
     /* output to serial port */
     strprint_serial("\n\n**** In 64 bit Kernel! ****\nFramebuffer Address: 0x");
     hexprint_serial(framebuffer_addr);
+
+    strprint_serial("\nPitch: 0x");
+    hexprint_serial(framebuffer_pitch);
 
     strprint_serial("\nWidth: 0x");
     hexprint_serial(framebuffer_width);
@@ -73,8 +153,29 @@ void kernel_main(){
 
     /* output to framebuffer */
     while(1)
-    for (int x = 0; x<0x2FFFF; x++){
+    for(float x = 0; x < 2000 * PI; x += 0.1){
+        
+        printk("%f\n", 125*cosine(x) + 125);
 
+        putpixel(x,125*cosine(x/20)+125,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
+        
+        //write_serial('B');
+        //((unsigned long*)(framebuffer_addr))[x] = random24();
+    }
+    //for(int z = 0; z < framebuffer_pitch /2; z++)
+    for (int x = 0, y = 0; x<100; x++, y++){
+        if( y >= 200)
+            y = 0;
+
+        printk("%f\n", 10*cosine(x/10) + 10);
+
+        putpixel(x,10*cosine(x)+10,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
+        
+        //write_serial('B');
+        //((unsigned long*)(framebuffer_addr))[x] = random24();
+    }
+    while(1)
+    for (int x = 0; x<0x2FFFF; x++){
         //write_serial('B');
         ((unsigned long*)(framebuffer_addr))[x] = random24();
     }
