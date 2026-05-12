@@ -339,8 +339,6 @@ check_long_mode:
     mov al, "L"
     jmp error
 
-%if 1
-
 setup_page_tables:
     ; Set up L4 page table to point to L3 page table
     mov eax, page_table_l3
@@ -357,8 +355,6 @@ setup_page_tables:
     ; ================================
     mov eax, page_table_l2_fb   ; Address of page_table_l2_fb
     or eax, 0b11                ; Present, Writable
-    
-    
     mov edx, [framebuffer_addr] ; load framebuffer address 
     shr edx, 30                 ; shift left to remove lower 30 bits
     mov [page_table_l3 + edx * 8], eax  ; L3 entry for framebuffer
@@ -370,15 +366,54 @@ setup_page_tables:
     ; ================================
     ; Identity Mapping using Huge Pages (2MB)
     ; ================================
+%if 0
     xor ecx, ecx                ; Reset counter for identity mapping
 .low_memory_loop:
     mov eax, ecx                ; Identity map: map 0x00000000 to 0x00000000
     or eax, 0b10000011          ; Present, Writable, Huge Page (2MB)
+    
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    ; Print newline (to move to the next line)
+    mov esi, newline            ; Load address of newline character
+    push esi
+    call print_string_serial
+    add esp, 4
+
+
     mov [page_table_l2 + ecx * 8], eax
     inc ecx
     cmp ecx, 512                ; 512 entries = 1GiB
     jne .low_memory_loop        ; Repeat for 1GiB of low memory
+%endif
 
+%if 1
+    xor ecx, ecx              ; counter
+.loop:
+    mov eax, 0x200000       ; 2MiB
+    mul ecx
+    or eax, 0b10000011       ; present, writable, huge page
+    mov [page_table_l2 + ecx * 8], eax
+
+
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    ; Print newline (to move to the next line)
+    mov esi, newline            ; Load address of newline character
+    push esi
+    call print_string_serial
+    add esp, 4
+
+    inc ecx                 ; counter++
+    cmp ecx, 512            ; if( counter != 512 )
+    jne .loop               ;   goto loop 
+
+    
+%endif
 
     ; ================================
     ; Map framebuffer in L2 using huge pages (2MB)
@@ -389,15 +424,50 @@ setup_page_tables:
     shr edx, 21                 ; shift left to remove lower 21 bits
     mov eax, [framebuffer_addr] ; 0xFD000000         ; Load framebuffer address
     or eax, 0b10000011          ; Present, Writable, Huge Page (2MB)
+
+
     mov [page_table_l2_fb+(edx*8)], eax ; Store in L2 entry for framebuffer
 
+
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    ; Print newline (to move to the next line)
+    mov esi, newline            ; Load address of newline character
+    push esi
+    call print_string_serial
+    add esp, 4
+
+
+    ; example
     ;mov [page_table_l2_fb+(488*8)], eax ; Store in L2 entry for framebuffer
     ;mov [page_table_l2_fb+(320*8)], eax ; Store in L2 entry for framebuffer
-    ;the index 488 = 1 1110 1000 is chosen because
+    ;the index 488 = 1 1110 1000 can be chosen because
     ; the 9 bits from bit 21 going left for fd00 0000 address = 488 
 
+    ; Map Next 2 MB
+    xor ecx,ecx
+    mov ecx, 1
+
+.map_vid_pages
+    mov edi, [framebuffer_addr] ; Load framebuffer address for index
+    mov eax,0x200000            ; Next 2 MB
+    mul ecx
+    add edi, eax                ; add 2 MB to the base framebuffer address
+    and edi, 0x3fe00000         ; Keep bit 22 to 31
+    shr edi, 21                 ; Shift left to remove lower 21 bits
+    mov ebx, [framebuffer_addr] ; Load framebuffer address for physical address 
+    mov eax, 0x200000
+    mul ecx
+    add ebx, eax                ; add 2MB to the base framebuffer address
+    or ebx, 0b10000011          ; Present, Writable, Huge Page (2MB)
+    mov [page_table_l2_fb+(edi*8)], ebx ; Store in L2 entry for framebuffer
+    inc ecx
+    cmp ecx, 7
+    jne .map_vid_pages
+
     ret
-%endif 
 
 %if 0
 ; The original mapping
