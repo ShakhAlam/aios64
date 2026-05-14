@@ -5,13 +5,10 @@
 #include <stdarg.h>
 
 
-void putpixel(unsigned int x, unsigned int y, unsigned int color,
-    unsigned char* framebuffer_addr, unsigned int pitch);
-
 
     // Draw a single character on the screen at position (x, y) with the given color
 
-void draw_char(int x, int y, char c, unsigned int color) {
+void draw_char(int x, int y, char c, unsigned int color, unsigned int bgcolor) {
     if (c < 32 || c > 127) return;  // Only print printable ASCII chars
 
     const unsigned char *glyph = ascii_8x13_font[c - 32];  // Get the font bitmap for the character
@@ -22,13 +19,14 @@ void draw_char(int x, int y, char c, unsigned int color) {
 
         // Iterate over the 8 columns (pixels per row)
         for (int col = 0; col < 8; col++) {
+            int px = (x + (9-col))*1;  // Calculate the x position
+            int py = (y + (14-row))*1;  // Calculate the y position
+
             // Check if the bit at position `col` in the row is set
             if (bits & (1  << col )) {  // Bits are stored from MSB to LSB
-                int px = (x + (9-col))*1;  // Calculate the x position
-                int py = (y + (14-row))*1;  // Calculate the y position
- 
+
                 // Calculate the pixel index in the buffer using pitch
-                int index = (py * framebuffer_pitch) + (px * 4);  // 4 bytes per pixel (BGRA format)
+                //int index = (py * framebuffer_pitch) + (px * 4);  // 4 bytes per pixel (BGRA format)
                 //printk("-->glyph: %x row: %d col: %d %d %d %d\n",c,row, col, px,py,index);
                 // Set the pixel to the specified color (BGRA format)
                // back_buffer[index + 0] = 0xFF; //(color >>  0) & 0xFF; // Blue
@@ -36,10 +34,13 @@ void draw_char(int x, int y, char c, unsigned int color) {
                // back_buffer[index + 2] = (color >> 16) & 0xFF; // Red
                // back_buffer[index + 3] = 0xFF;                 // Alpha
 
-                putpixel(px,py, color,(unsigned char*) back_buffer, framebuffer_pitch);
-                putpixel(px-1,py, color,(unsigned char*) back_buffer, framebuffer_pitch);
-                putpixel(px,py-1, color,(unsigned char*) back_buffer, framebuffer_pitch);
+                putpixel(px,py, color,framebuffer_addr, framebuffer_pitch);
+                //putpixel(px-1,py, color, framebuffer_addr, framebuffer_pitch);
+                //putpixel(px,py-1, color, framebuffer_addr, framebuffer_pitch);
                               
+            }else{
+                putpixel(px,py, bgcolor,framebuffer_addr, framebuffer_pitch);
+                
             }
         }
     }
@@ -56,7 +57,7 @@ void print_xy(int x, int y, const char *str, unsigned int color) {
             cursor_y += 15; // Move to the next row (height of the font)
             counter = 0;
         } else {
-            draw_char(cursor_x, cursor_y, *str, color);
+            draw_char(cursor_x, cursor_y, *str, color,0);
             cursor_x += 10; // Move to the next character
         }
         str++;
@@ -158,30 +159,39 @@ void printf_gfx(int x, int y, unsigned int color, const char *fmt, ...) {
 static int term_cursor_x = 0;
 static int term_cursor_y = 0;
 
-void scroll_backbuffer(unsigned char *back_buffer,
+void scroll_backbuffer(unsigned int *back_buffer,
                        int framebuffer_width,
                        int framebuffer_height,
                        int framebuffer_pitch,
                        int char_height)
 {
-    int rows_to_scroll = char_height;
+    int rows_to_scroll = 20; //char_height;
     int bytes_per_row = framebuffer_pitch;
 
     int srcY, srcX, dstX, dstY;
 
-    for(srcY = 1080; srcY > rows_to_scroll+200; srcY--){
-        for (srcX = 0; srcX < 1920; srcX++){
+    for(srcY = rows_to_scroll; srcY < framebuffer_height; srcY++){
+        for (srcX = 0; srcX < framebuffer_width; srcX++){
 
             dstX = srcX;
             dstY = srcY - rows_to_scroll;
 
-            unsigned int *dst = ((unsigned int*)back_buffer) + ((dstY * 1920) + dstX);
-            unsigned int *src = ((unsigned int*)back_buffer) + ((srcY * 1920) + srcX);
+            unsigned int *dst = ((unsigned int*)back_buffer) + ((dstY * framebuffer_width) + dstX);
+            unsigned int *src = ((unsigned int*)back_buffer) + ((srcY * framebuffer_width) + srcX);
 
             *dst = *src;
 
         }
     }
+
+
+    for(int y = framebuffer_height - rows_to_scroll; y < framebuffer_height - 1; y++)
+        for(int x = 0; x < framebuffer_width - 10; x++){
+            unsigned int *dst = back_buffer + ((y * framebuffer_width) + x);
+            *dst = 0;
+        }
+    
+
 
     /*
     // Move framebuffer content up
@@ -302,9 +312,12 @@ int vsnprintf(char *buffer, int bufsize, const char *fmt, va_list args) {
 
 
 
-void printf_gfx_term(unsigned int color, const char *fmt, ...) {
-    static int term_x = 10;
-    static int term_y = 60;
+void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, ...) {
+    static int term_x = 0;
+    static int term_y = 0;
+
+    static int prev_term_x = 0;
+    static int prev_term_y = 0;
 
     char buf[1024];
     va_list args;
@@ -313,29 +326,45 @@ void printf_gfx_term(unsigned int color, const char *fmt, ...) {
     va_end(args);
 
     // Calculate how many rows of space needed
-    const int char_width = 20;
-    const int char_height = 20;
+    const int char_width = 10;
+    const int char_height = 14;
     const int screen_width = 1920;
     const int screen_height = 1080;
 
     // Wrap to next line when needed
-    for (const char *p = buf; *p; p++) {
+    for (const char *p = buf; *p;  p++) {
+        
+        if(*p == 0x8){
+            if(term_x >= char_width*2)
+                term_x -= char_width*2;
+            else{
+                term_x = prev_term_x;
+                term_y = prev_term_y;
+
+            }
+            draw_char(term_x, term_y, ' ', 0,0);
+            
+            return;
+        }
+
         if (*p == '\n' || term_x + char_width > screen_width) {
+            prev_term_x = term_x;
+            prev_term_y = term_y;
             term_x = 0;
             term_y += char_height;
 
             if (term_y + char_height >= screen_height) {
-                scroll_backbuffer(back_buffer,framebuffer_width,
+                scroll_backbuffer(framebuffer_addr,framebuffer_width,
                     framebuffer_height,framebuffer_pitch, char_height);  // Your own scroll function
                 term_y -= char_height;
                 //term_y = 20;
-                printf_gfx_term(0xFFFFFFFF,"Scrolling!");
+                //printf_gfx_term(0xFFFFFFFF,"Scrolling!");
             }
 
             if (*p == '\n') continue;
         }
 
-        draw_char(term_x, term_y, *p, color);
+        draw_char(term_x, term_y, *p, color,bgcolor);
         term_x += char_width;
     }
 }

@@ -345,10 +345,28 @@ setup_page_tables:
     or eax, 0b11                ; Present, Writable
     mov [page_table_l4], eax    ; Store L4 entry pointing to L3
 
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    lea eax,[str_pt3]
+    push eax
+    call print_string_serial
+    add esp, 4
+
     ; Set up L3 page table to point to L2 page table
     mov eax, page_table_l2
     or eax, 0b11                ; Present, Writable
     mov [page_table_l3], eax    ; Store L3 entry pointing to L2
+
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    lea eax,[str_pt2]
+    push eax
+    call print_string_serial
+    add esp, 4
 
     ; ================================
     ; Add the entry for page_table_l2_fb in page_table_l3
@@ -372,10 +390,12 @@ setup_page_tables:
     mov eax, ecx                ; Identity map: map 0x00000000 to 0x00000000
     or eax, 0b10000011          ; Present, Writable, Huge Page (2MB)
     
+    
     push eax
     call print_hex_serial
     add esp, 4
 
+    
     ; Print newline (to move to the next line)
     mov esi, newline            ; Load address of newline character
     push esi
@@ -397,17 +417,6 @@ setup_page_tables:
     or eax, 0b10000011       ; present, writable, huge page
     mov [page_table_l2 + ecx * 8], eax
 
-
-    push eax
-    call print_hex_serial
-    add esp, 4
-
-    ; Print newline (to move to the next line)
-    mov esi, newline            ; Load address of newline character
-    push esi
-    call print_string_serial
-    add esp, 4
-
     inc ecx                 ; counter++
     cmp ecx, 512            ; if( counter != 512 )
     jne .loop               ;   goto loop 
@@ -425,20 +434,7 @@ setup_page_tables:
     mov eax, [framebuffer_addr] ; 0xFD000000         ; Load framebuffer address
     or eax, 0b10000011          ; Present, Writable, Huge Page (2MB)
 
-
     mov [page_table_l2_fb+(edx*8)], eax ; Store in L2 entry for framebuffer
-
-
-    push eax
-    call print_hex_serial
-    add esp, 4
-
-    ; Print newline (to move to the next line)
-    mov esi, newline            ; Load address of newline character
-    push esi
-    call print_string_serial
-    add esp, 4
-
 
     ; example
     ;mov [page_table_l2_fb+(488*8)], eax ; Store in L2 entry for framebuffer
@@ -497,6 +493,16 @@ setup_page_tables:
 enable_paging:
     mov eax, page_table_l4  ; page table location
     mov cr3, eax            ; send to cpu via cr3
+
+    push eax
+    call print_hex_serial
+    add esp, 4
+
+    lea eax,[str_cr3]
+    push eax
+    call print_string_serial
+    add esp, 4
+
 
     mov eax, cr4            ; enable PAE
     or eax, 1 << 5
@@ -569,4 +575,9 @@ section .data
     format_tag db "Tag 0x", 0           ; String for "Tag 0x"
     format_size db " Size 0x", 0        ; String for " Size 0x"
     newline db 0xA, 0                  ; Newline character (line feed)
-    longmode_message db 0xA,"Entering 64bit Mode!",0xA
+    longmode_message db 0xA,"Entering 64bit Mode!",0xA,0
+    str_cr3 db "<- CR3",0xA,0
+    str_pt4 db "<- Page Table Level 4",0xA,0
+    str_pt3 db "<- Page Table Level 3",0xA,0
+    str_pt2 db "<- Page Table Level 2 ",0xA,0
+

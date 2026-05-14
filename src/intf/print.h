@@ -29,4 +29,4 @@ void print_set_color(uint8_t foreground, uint8_t background);
 
 
 void printk(const char* fmt, ...) ;
-void printf_gfx_term(unsigned int color, const char *fmt, ...);
+void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, ...);
