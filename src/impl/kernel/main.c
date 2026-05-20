@@ -4,7 +4,8 @@
 #include "kernel/strings/strings.h"
 #include "kernel/util/shell.h"
 #include "kernel/util/math.h"
-
+#include "kernel/sys/x86_64/interrupt.h"
+#include "kernel/sys/x86_64/idt.h"
 #include <stddef.h>
 
 
@@ -80,6 +81,25 @@ void clear_back_buffer() {
     );
 }
 
+
+void page_fault_handler(void* frame, unsigned long error_code) {
+    // Read fault address from CR2
+    uint64_t fault_address;
+    __asm__ volatile ("mov %%cr2, %0" : "=r" (fault_address));
+
+    write_serial('!');
+    // Basic debug output
+    printf_gfx_term(0xFF0000, 0, "\nPage Fault!");
+    printf_gfx_term(0xFF0000, 0, "\nCR2 = 0x%lx", fault_address);
+    printf_gfx_term(0xFF0000, 0, "\nErr Code = 0x%lx", error_code);
+
+    //while(1);
+    // Halt system
+    while (1) {
+        __asm__ volatile ("cli; hlt");
+    }
+}
+
 void kernel_main(){
 
     /* output to serial port */
@@ -104,6 +124,31 @@ void kernel_main(){
     hexprint_serial(&back_buffer);
     
     write_serial('\n');
+
+    volatile int* ptr = (int*)0xDEADBEEF;
+    //int val = *ptr; // Access invalid memory
+
+
+    pic_remap();
+
+    idt_init();
+    
+    set_idt_entry(32, isr_timer, 0x8E);     // IRQ0 (timer)
+    set_idt_entry(33, isr_keyboard, 0x8E);  // IRQ1 (keyboard)
+
+    //set_idt_entry(14, isr_page_fault, 0x8E);
+
+    
+    pic_init_timer(1);   // 100Hz
+    
+    //pic_unmask_irq(0); // timer
+
+    pic_unmask_irq(1); // keyboard
+
+    idt_load();
+    
+
+    asm volatile ("sti");  // 💥 Enable interrupts here
 
     putpixel(1920,1080,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
     

@@ -1,8 +1,7 @@
 #include "print.h"
 /* Printf and related */
 
-// Declare your serial write function (should be implemented elsewhere)
-extern void write_serial(char c);
+
 
 static void print_string(const char* str) {
     while (*str) {

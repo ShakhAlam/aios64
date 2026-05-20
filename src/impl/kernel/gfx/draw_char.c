@@ -168,28 +168,26 @@ void scroll_backbuffer(unsigned int *back_buffer,
     int rows_to_scroll = 20; //char_height;
     int bytes_per_row = framebuffer_pitch;
 
-    int srcY, srcX, dstX, dstY;
+    int srcY, dstY;
 
     for(srcY = rows_to_scroll; srcY < framebuffer_height; srcY++){
-        for (srcX = 0; srcX < framebuffer_width; srcX++){
+        
+        dstY = srcY - rows_to_scroll;
+        unsigned int *dst = ((unsigned int*)back_buffer) + ((dstY * framebuffer_width) );
+        unsigned int *src = ((unsigned int*)back_buffer) + ((srcY * framebuffer_width) );
 
-            dstX = srcX;
-            dstY = srcY - rows_to_scroll;
-
-            unsigned int *dst = ((unsigned int*)back_buffer) + ((dstY * framebuffer_width) + dstX);
-            unsigned int *src = ((unsigned int*)back_buffer) + ((srcY * framebuffer_width) + srcX);
-
-            *dst = *src;
-
+        for (int x = 0; x < framebuffer_width; x++){
+            dst[x] = src[x];
         }
     }
 
 
-    for(int y = framebuffer_height - rows_to_scroll; y < framebuffer_height - 1; y++)
-        for(int x = 0; x < framebuffer_width - 10; x++){
-            unsigned int *dst = back_buffer + ((y * framebuffer_width) + x);
-            *dst = 0;
+    for(int y = framebuffer_height - rows_to_scroll; y < framebuffer_height - 1; y++){
+        unsigned int *dst = back_buffer + ((y * framebuffer_width) );
+        for(int x = 0; x < framebuffer_width ; x++){
+            dst[x] = 0;
         }
+    }
     
 
 

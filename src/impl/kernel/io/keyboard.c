@@ -1,4 +1,10 @@
 #include "print.h"
+#include "kernel/io/keyboard.h"
+
+char keyboard_buffer[KEYBOARD_BUFFER_SIZE];
+int kb_buf_head = 0;
+int kb_buf_tail = 0;
+
 
 int shift_pressed = 0;
 int capslock_active = 0;
@@ -26,6 +32,7 @@ unsigned char getch() {
     );
 
     __asm__ __volatile__("pause");
+
 
     int key_released = scancode & 0x80;
     scancode &= 0x7F; // Strip release bit
@@ -67,17 +74,39 @@ unsigned char getch() {
     return ascii;
 }
 
+char getchar() {
+    while (kb_buf_head == kb_buf_tail) {
+        // Wait for a character to be buffered by the ISR
+        asm volatile ("hlt");
+    }
+
+    char c = keyboard_buffer[kb_buf_tail];
+    kb_buf_tail = (kb_buf_tail + 1) % KEYBOARD_BUFFER_SIZE;
+    return c;
+}
+
+char getchar_nonblock() {
+    if (kb_buf_head == kb_buf_tail) {
+        return 0; // No character available
+    }
+
+    char c = keyboard_buffer[kb_buf_tail];
+    kb_buf_tail = (kb_buf_tail + 1) % KEYBOARD_BUFFER_SIZE;
+    return c;
+}
+
+
 char* k_fgets(char* buffer, int max_len) {
     int i = 0;
 
     while (i < max_len - 1) {
-        unsigned char c = getch();
+        unsigned char c = getchar();
         if(c == 0){ // skip meta chars
        //     printf_gfx_term(0xFFFFFFFF,0," <ctrl> ");
-            c = getch();
+            c = getchar();
             if(c == 0){ // skip meta chars
          //       printf_gfx_term(0xFFFFFFFF,0," <ctrl> ");
-                c = getch();
+                c = getchar();
             }    
         }
 

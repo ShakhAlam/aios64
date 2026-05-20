@@ -134,7 +134,7 @@ shell(void){
     while(1){
         printf_gfx_term(0xFFFFFF00,0,"$ ");
         k_fgets(buf,128);
-
+        //buf[0]=0;
         int numCommands = (sizeof(commandsMap) / sizeof(struct Command));
         
         int i;
