@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "print.h"
 #include "kernel/io/keyboard.h"
 
@@ -5,9 +6,57 @@ char keyboard_buffer[KEYBOARD_BUFFER_SIZE];
 int kb_buf_head = 0;
 int kb_buf_tail = 0;
 
+extern void io_wait(void);
+
+#define SCANCODE_BUFFER_SIZE 128
+extern volatile unsigned char scancode_buffer[];
+extern volatile int scancode_head;
+extern volatile int scancode_tail;
+
+int read_scancode_blocking(void) {
+    while (scancode_head == scancode_tail) {
+        __asm__ volatile ("hlt");
+    }
+
+    unsigned char scancode = scancode_buffer[scancode_tail];
+    scancode_tail = (scancode_tail + 1) % SCANCODE_BUFFER_SIZE;
+    return scancode;
+}
+
+int read_scancode_nonblock(unsigned char* out_scancode) {
+    if (scancode_head == scancode_tail) {
+        return 0; // no scancode available
+    }
+
+    *out_scancode = scancode_buffer[scancode_tail];
+    scancode_tail = (scancode_tail + 1) % SCANCODE_BUFFER_SIZE;
+    return 1;
+}
+
+static const char scancode_ascii[] = {
+    0,  27, '1', '2', '3', '4', '5', '6', // 0x00 - 0x07
+   '7', '8', '9', '0', '-', '=', '\b', '\t', // 0x08 - 0x0F
+   'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', // 0x10 - 0x17
+   'o', 'p', '[', ']', '\n', 0,  'a', 's', // 0x18 - 0x1F
+   'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', // 0x20 - 0x27
+   '\'', '`', 0, '\\', 'z', 'x', 'c', 'v', // 0x28 - 0x2F
+   'b', 'n', 'm', ',', '.', '/', 0,  '*', // 0x30 - 0x37
+    0,  ' ', 0,    0,    0,    0,    0,    0,  // 0x38 - 0x3F
+    0,  0,   0,    0,    0,    0,    0,    0   // 0x40 - 0x47
+    // Add more if you want to support extended scancodes
+};
+
+char scancode_to_ascii(unsigned char scancode) {
+    if (scancode >= sizeof(scancode_ascii)) {
+        return 0; // Unknown/unsupported key
+    }
+    return scancode_ascii[scancode];
+}
+
 
 int shift_pressed = 0;
 int capslock_active = 0;
+
 
 unsigned char getch() {
     unsigned char scancode = 0;
@@ -74,6 +123,9 @@ unsigned char getch() {
     return ascii;
 }
 
+char getchar();
+
+/*
 char getchar() {
     while (kb_buf_head == kb_buf_tail) {
         // Wait for a character to be buffered by the ISR
@@ -95,6 +147,7 @@ char getchar_nonblock() {
     return c;
 }
 
+*/
 
 char* k_fgets(char* buffer, int max_len) {
     int i = 0;
@@ -142,3 +195,4 @@ char* k_fgets(char* buffer, int max_len) {
     //printf_gfx_term(0xFFFFFFFF,0," <cmp> ");
     return buffer;
 }
+

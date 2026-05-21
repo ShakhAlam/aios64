@@ -4,6 +4,7 @@
 #include "print.h"
 #include "kernel/io/keyboard.h"
 
+
 extern void isr_keyboard();
 extern void isr_timer();
 
@@ -27,7 +28,7 @@ void irq_handler_common() {
     pic_send_eoi(1);
 }*/
 
-void keyboard_handler(void* frame) {
+/*void keyboard_handler(void* frame) {
     unsigned char scancode = inb(0x60);
 
     // Example US QWERTY mapping (just ASCII for A-Z here)
@@ -50,6 +51,7 @@ void keyboard_handler(void* frame) {
 
     pic_send_eoi(1); // IRQ1 - keyboard
 }
+*/
 
 //__attribute__((interrupt))
 void timer_handler(void* frame) {
