@@ -10,12 +10,12 @@ section .text
 
 isr_page_fault:
     cli
-    mov al, '!'
-    mov dx, 0x3F8              ; Data Register (THR)
-    out dx, al
+    ;mov al, '!'
+    ;mov dx, 0x3F8              ; Data Register (THR)
+    ;out dx, al
 
 
-    ;call page_fault_handler
+    call page_fault_handler
     sti
     iretq
 

@@ -334,7 +334,7 @@ void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, .
         
         if(*p == 0x8){
             if(term_x >= char_width*2)
-                term_x -= char_width*2;
+                term_x -= char_width;
             else{
                 term_x = prev_term_x;
                 term_y = prev_term_y;

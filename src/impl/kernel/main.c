@@ -87,11 +87,15 @@ void page_fault_handler(void* frame, unsigned long error_code) {
     uint64_t fault_address;
     __asm__ volatile ("mov %%cr2, %0" : "=r" (fault_address));
 
-    write_serial('!');
+    write_serial('Page Fault Detected\n');
+    hexprint_serial(fault_address);
+    write_serial('\nError Code\n0x');
+    hexprint_serial(error_code);
+
     // Basic debug output
-    printf_gfx_term(0xFF0000, 0, "\nPage Fault!");
-    printf_gfx_term(0xFF0000, 0, "\nCR2 = 0x%lx", fault_address);
-    printf_gfx_term(0xFF0000, 0, "\nErr Code = 0x%lx", error_code);
+    printf_gfx_term(0xFFFF00, 0, "\nPage Fault!");
+    printf_gfx_term(0xFFFF00, 0, "\nCR2 = 0x%x", fault_address);
+    printf_gfx_term(0xFFFF00, 0, "\nError Code = 0x%x", error_code);
 
     //while(1);
     // Halt system
@@ -101,7 +105,6 @@ void page_fault_handler(void* frame, unsigned long error_code) {
 }
 
 void kernel_main(){
-
     /* output to serial port */
     strprint_serial("\n\n**** In 64 bit Kernel! ****\nFramebuffer Address: 0x");
     hexprint_serial(framebuffer_addr);
@@ -112,11 +115,9 @@ void kernel_main(){
     strprint_serial("\nWidth: 0x");
     hexprint_serial(framebuffer_width);
     
-
     strprint_serial("\nHeight: 0x");
     hexprint_serial(framebuffer_height);
     
-
     strprint_serial("\nDepth: 0x");
     hexprint_serial(framebuffer_depth);
 
@@ -125,18 +126,13 @@ void kernel_main(){
     
     write_serial('\n');
 
-    volatile int* ptr = (int*)0xDEADBEEF;
-    //int val = *ptr; // Access invalid memory
-
-
     pic_remap();
 
     idt_init();
     
     set_idt_entry(32, isr_timer, 0x8E);     // IRQ0 (timer)
     set_idt_entry(33, isr_keyboard, 0x8E);  // IRQ1 (keyboard)
-
-    //set_idt_entry(14, isr_page_fault, 0x8E);
+    set_idt_entry(14, isr_page_fault, 0x8E); // page fault 
 
     
     pic_init_timer(1);   // 100Hz
@@ -147,17 +143,14 @@ void kernel_main(){
 
     idt_load();
     
-
     asm volatile ("sti");  // 💥 Enable interrupts here
+
+    volatile int* ptr = (int*)0xDEEDBEEF;
+    int val = *ptr; // Access invalid memory to test page fault handler
+
 
     putpixel(1920,1080,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
     
     shell();
     
-    /* output to CGA*/
-    print_clear();
-    print_set_color(PRINT_COLOR_LIGHT_BLUE, PRINT_COLOR_BLACK);
-    print_str("Welcome to AIOS!");
-    
-
 }
