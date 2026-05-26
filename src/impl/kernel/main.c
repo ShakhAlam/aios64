@@ -8,6 +8,8 @@
 #include "kernel/sys/x86_64/idt.h"
 #include <stddef.h>
 
+#include "kernel/sys/x86_64/scheduler.h"
+#include "kernel/io/serial.h"
 
 
 extern unsigned long framebuffer_addr,
@@ -16,36 +18,13 @@ extern unsigned long framebuffer_addr,
                      framebuffer_depth,
                      framebuffer_pitch;
 
-void write_serial(char c) {
-    __asm__ volatile (
-        "movb %0, %%al \n\t"  // Load character into AL
-        "movw $0x3F8, %%dx \n\t"  // Load COM1 port address into DX
-        "outb %%al, %%dx \n\t"  // Output character to COM1
-        :
-        : "r"(c)  // Input operand: character to print
-        : "al", "dx"  // Clobbered registers
-    );
-}
+
 
 #define RED 0xff0000
 #define GREEN 0xff00
 #define BLUE 0xff
 #define YELLOW 0xffff00
 
-void strprint_serial(char *str){
-    while(*str++){
-        write_serial(*str);
-    }
-}
-
-void hexprint_serial(unsigned long n){
-    for(int x=sizeof(n)-1; x >= 0; x--){
-        char ch = (char)(((n >> (x*4)) & 0xf));
-        ch = (ch > 10) ? ch + 55 : ch + 48;
-        write_serial((char)ch);
-    }
-    write_serial((char)'\n');
-}
 
 #define WIDTH 1920
 #define HEIGHT 1080
@@ -137,19 +116,23 @@ void kernel_main(){
     
     pic_init_timer(1);   // 100Hz
     
-    //pic_unmask_irq(0); // timer
+    pic_unmask_irq(0); // timer
 
     pic_unmask_irq(1); // keyboard
 
     idt_load();
+
     
+
+    init_tasking();
     asm volatile ("sti");  // 💥 Enable interrupts here
 
-    volatile int* ptr = (int*)0xDEEDBEEF;
-    int val = *ptr; // Access invalid memory to test page fault handler
+
+    //volatile int* ptr = (int*)0xDEEDBEEF;
+    //int val = *ptr; // Access invalid memory to test page fault handler
 
 
-    putpixel(1920,1080,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
+    //putpixel(1920,1080,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
     
     shell();
     

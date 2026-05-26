@@ -6,20 +6,8 @@
 #include "print.h"
 #include "framebuffer.h"
 #include "kernel/x86_64/readregs.h"
+#include "kernel/util/shell.h"
 
-
-enum command{
-    showBuffers = 0,
-    drawCosine,
-    showCR3,
-    unknown
-} ;
-
-
-struct Command {
-    enum command cmd;
-    const char * cmdStr;
-};
 
 
 

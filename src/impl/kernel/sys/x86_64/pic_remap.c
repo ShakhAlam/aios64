@@ -47,7 +47,7 @@ void pic_remap() {
 
 }
 
-void pic_init_timer(uint32_t frequency) {
+void pic_init_timer1(uint32_t frequency) {
     uint32_t divisor = 1193180 / frequency;
 
     outb(0x43, 0x36);               // Command port
@@ -55,6 +55,14 @@ void pic_init_timer(uint32_t frequency) {
     outb(0x40, (divisor >> 8) & 0xFF); // High byte
 }
 
+void pic_init_timer(uint32_t frequency) {
+    uint32_t divisor = 1193180 / frequency;
+    if (divisor > 65535) divisor = 65535;
+
+    outb(0x43, 0x36);               // PIT control port: channel 0, low/high, mode 3
+    outb(0x40, divisor & 0xFF);     // Send low byte
+    outb(0x40, (divisor >> 8) & 0xFF); // Send high byte
+}
 
 void pic_unmask_irqs(){
 

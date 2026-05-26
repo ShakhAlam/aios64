@@ -32,3 +32,10 @@ int strlen(const char *s1){
         
     return len;
 }
+
+int strncpy(char *dst, const char *src, int len){
+    while(len-- > 0 && *src){
+        *dst++ = *src++;
+    }
+
+}

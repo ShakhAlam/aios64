@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 enum {
     PRINT_COLOR_BLACK = 0,
@@ -32,3 +33,6 @@ void printk(const char* fmt, ...) ;
 void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, ...);
 
 extern void write_serial(char c);
+void strprint_serial(char *str);
+int vsnprintf(char *buffer, int bufsize, const char *fmt, va_list args) ;
+

@@ -88,27 +88,27 @@ check_multiboot:
     mov ecx, 474
 .l1
 
-    lea eax, [str_star_ebx]  ; Load the address of the string into EAX
-    push eax              ; Pass the string address as an argument
-    call print_string_serial     
-    add esp,4
+    ;lea eax, [str_star_ebx]  ; Load the address of the string into EAX
+    ;push eax              ; Pass the string address as an argument
+    ;call print_string_serial     
+    ;add esp,4
 
-    mov eax, ecx   ; Load the value from memory into EAX
-    push eax           ; Push the value onto the stack
-    call print_hex_serial       ; Print tag type as hex
-    add esp, 4 
+    ;mov eax, ecx   ; Load the value from memory into EAX
+    ;push eax           ; Push the value onto the stack
+    ;call print_hex_serial       ; Print tag type as hex
+    ;add esp, 4 
     
-    mov al, ' '
-    call print_char_serial
+    ;mov al, ' '
+    ;call print_char_serial
 
 
-    mov eax, [ebx+ecx*4]   ; Load the value from memory into EAX
-    push eax           ; Push the value onto the stack
-    call print_hex_serial       ; Print tag type as hex
-    add esp, 4 
+    ;mov eax, [ebx+ecx*4]   ; Load the value from memory into EAX
+    ;push eax           ; Push the value onto the stack
+    ;call print_hex_serial       ; Print tag type as hex
+    ;add esp, 4 
     
-    mov al,0x0a
-    call print_char_serial      ; Print a new line
+    ;mov al,0x0a
+    ;call print_char_serial      ; Print a new line
 
     sub ecx, 1
     jns .l1
