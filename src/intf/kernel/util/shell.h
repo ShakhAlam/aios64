@@ -16,4 +16,4 @@ struct Command {
 
 int interpret(struct Command c, const char *buf);
 
-int shell(void);
+int shell(int tid);

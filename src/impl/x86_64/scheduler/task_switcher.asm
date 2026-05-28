@@ -151,7 +151,7 @@ switch_to_first_task:
     push rdi
     push rsi
     mov rsi, [rdi + 8]
-    mov rdi, str_rsp_next
+    mov rdi, str_rsp_first
     
     call printf_serial
     pop rsi
@@ -161,7 +161,7 @@ switch_to_first_task:
     push rsi
     push rax
     mov rax, [rdi + 8]
-    mov rdi, str_star_rsp_next
+    mov rdi, str_star_rsp_first
     mov rsi, [rax]
     call printf_serial
     pop rax
@@ -212,6 +212,10 @@ section .data
 
     str_rsp_next db "Next Task RSP: 0x%x. Will load this to rsp", 0xa, 0
     str_star_rsp_next db "Next Task *RSP: 0x%x. This is the next RIP after ret.", 0xa, 0
+
+
+    str_rsp_first db "First Task RSP: 0x%x. Will load this to rsp", 0xa, 0
+    str_star_rsp_first db "First Task *RSP: 0x%x. This is the next RIP after ret.", 0xa, 0
 
     str_task_cs db "Task CS: 0x%x.", 0xa, 0
 

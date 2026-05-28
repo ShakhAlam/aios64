@@ -66,20 +66,33 @@ void page_fault_handler(void* frame, unsigned long error_code) {
     uint64_t fault_address;
     __asm__ volatile ("mov %%cr2, %0" : "=r" (fault_address));
 
-    write_serial('Page Fault Detected\n');
-    hexprint_serial(fault_address);
-    write_serial('\nError Code\n0x');
-    hexprint_serial(error_code);
+    struct task * t = get_current_task();
+    
+    log_serial(critical,"Page Fault Detected."
+            "Current Task ID: %d, "
+            "Fault Address (CR2): %lx, "
+            "Error Code: %lx\n",
+            t->pid,
+            fault_address,
+            error_code
+    );
 
     // Basic debug output
     printf_gfx_term(0xFFFF00, 0, "\nPage Fault!");
     printf_gfx_term(0xFFFF00, 0, "\nCR2 = 0x%x", fault_address);
     printf_gfx_term(0xFFFF00, 0, "\nError Code = 0x%x", error_code);
 
+    //TODO: tech-debt in the following code
+    //The switch to an appropriate next task needs to be
+    //synchronized. Need kernel synchronization features.
+    //Currenly sync is not in MVP
+    current_task = current_task->next;
+    first_task_start();
+
     //while(1);
     // Halt system
     while (1) {
-        __asm__ volatile ("cli; hlt");
+        __asm__ volatile ("hlt");
     }
 }
 
@@ -113,6 +126,8 @@ void kernel_main(){
     set_idt_entry(33, isr_keyboard, 0x8E);  // IRQ1 (keyboard)
     set_idt_entry(14, isr_page_fault, 0x8E); // page fault 
 
+    set_idt_entry(13, (uint64_t) isr_gp_fault, 0x8E); // vector 13 = GPF
+
     
     pic_init_timer(1);   // 100Hz
     
@@ -133,7 +148,5 @@ void kernel_main(){
 
 
     //putpixel(1920,1080,random24(), (uint8_t*) framebuffer_addr, framebuffer_pitch);
-    
-    shell();
-    
+       
 }

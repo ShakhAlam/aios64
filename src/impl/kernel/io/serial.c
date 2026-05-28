@@ -83,7 +83,14 @@ static void print_float(double value) {
     }
 }
 
-void printf_serial(const char* fmt, ...) {
+static const loglevel enabled_loglevel = critical;
+
+void 
+log_serial(loglevel l, char* fmt, ...) {
+    //return;
+    if(l > enabled_loglevel)
+        return;
+
     va_list args;
     va_start(args, fmt);
 
@@ -101,6 +108,50 @@ void printf_serial(const char* fmt, ...) {
                     if (*(fmt + 1) == 'u') {
                         fmt++;
                         print_unsigned(va_arg(args, unsigned long), 10, false);
+                    }
+                    if (*(fmt + 1) == 'x') {
+                        fmt++;
+                        print_unsigned(va_arg(args, unsigned long), 16, false);
+                    }
+                    
+                    break;
+                default:
+                    write_serial('%');
+                    write_serial(*fmt);
+            }
+        } else {
+            write_serial(*fmt);
+        }
+        fmt++;
+    }
+
+    va_end(args);
+}
+
+void 
+printf_serial(const char* fmt, ...) {
+    //return;
+    va_list args;
+    va_start(args, fmt);
+
+    while (*fmt) {
+        if (*fmt == '%' && *(fmt + 1)) {
+            fmt++;
+            switch (*fmt) {
+                case 's': print_string(va_arg(args, const char*)); break;
+                case 'c': write_serial((char)va_arg(args, int)); break;
+                case 'd': print_signed(va_arg(args, int)); break;
+                case 'f': print_float(va_arg(args, double)); break;
+                case 'x': print_unsigned(va_arg(args, unsigned int), 16, false); break;
+                case 'u': print_unsigned(va_arg(args, unsigned long), 10, false); break;
+                case 'l':
+                    if (*(fmt + 1) == 'u') {
+                        fmt++;
+                        print_unsigned(va_arg(args, unsigned long), 10, false);
+                    }
+                    if (*(fmt + 1) == 'x') {
+                        fmt++;
+                        print_unsigned(va_arg(args, unsigned long), 16, false);
                     }
                     break;
                 default:

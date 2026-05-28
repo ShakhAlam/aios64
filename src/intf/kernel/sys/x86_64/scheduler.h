@@ -5,11 +5,19 @@ extern void switch_task(struct task *current, struct task *next);
 
 void init_tasking();
 void schedule();
-struct task *create_task(void (*entry)(), int id);
-int add_task(struct task* new_task);
+struct task * create_task(void (*entry)(), int id);
+struct task * add_task(struct task* new_task);
+struct task * remove_task(int id);
+struct task * exit_task(int id);
+struct task *get_current_task();
+int get_current_task_id();
+
 void thread1();
 void thread2();
-void thread3();
+void thread3(int tid);
+
+extern struct task *current_task;
+extern first_task_start();
 
 void idle_task();
 

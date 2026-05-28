@@ -8,7 +8,8 @@
 #include "kernel/x86_64/readregs.h"
 #include "kernel/util/shell.h"
 
-
+#include "kernel/sys/x86_64/scheduler.h"
+#include "kernel/io/serial.h"
 
 
 struct Command commandsMap[] = {
@@ -22,7 +23,7 @@ struct Command commandsMap[] = {
     },
     {
         .cmd = showCR3,
-        .cmdStr = "show cr3"
+        .cmdStr = "memory map"
     },
     {
         .cmd = unknown,
@@ -32,12 +33,24 @@ struct Command commandsMap[] = {
 
 
 void
-showBuf(){
+showBuf(int tid){
+
+    tid = get_current_task_id();
+
+    printf_gfx_term(0xFFFF,0,"Thread Id = %d \n", tid);
+
     printf_gfx_term(0xFFFF, 0, "Framebuffer address: 0x%x\n", framebuffer_addr);
     printf_gfx_term(0xFFFF, 0, "Backbuffer address: 0x%x\n", back_buffer);
+
+    remove_task(tid);
 }
 
-void drawCos(){
+void drawCos(int tid){
+
+    __asm__ volatile ("cli");
+    
+    tid = get_current_task_id();
+
     for(int f = 1; f < 50; f++){
 
         for(float x = 0; x < 600* PI; x += 0.1){
@@ -53,6 +66,11 @@ void drawCos(){
         //blit_to_framebuffer((void*) framebuffer_addr, back_buffer, SCREEN_SIZE);
         //clear_back_buffer();
     }
+
+    remove_task(tid);
+
+    __asm__ volatile("sti");
+    
 }
 
 void
@@ -60,7 +78,11 @@ clearScreen(){
     //clear_screen(framebuffer_addr,)
 }
 
-void showRegisterCR3(){
+void showRegisterCR3(int tid){
+    tid = get_current_task_id();
+
+    __asm__ volatile ("cli");
+
     unsigned long cr3 = getCR3();
     printf_gfx_term(0xFFFF,0,"CR3 = %x = PT4\n", cr3);
 
@@ -88,34 +110,48 @@ void showRegisterCR3(){
     }
 
     printf_gfx_term(0xFFFF00,0,"\n");    
+    remove_task(tid);
+    __asm__ volatile ("sti");
+    
+    //asm __volatile__ ("hlt");
 
 }
 
 int 
 interpret(struct Command c, const char *buf){
+    static int id = 10;
     if(strlen(buf) == 0)
         return 0;
+    
+    void (*fn)(int) = 0;
+
     switch(c.cmd){
         case showBuffers:
-            showBuf();
+            fn = showBuf;
 
         break;
         case drawCosine:
-            drawCos();
+            fn = drawCos;
         break;
         case showCR3:
-            showRegisterCR3();
+            fn = showRegisterCR3;
         break;    
         default:
             printf_gfx_term(0xFFFFFFFF,0,"Unknown command: %s\n",buf);
 
+    }
+    if(fn){
+        struct task * t = create_task(fn,id++);
+        add_task(t);
     }
 
     return 0;
 }
 
 int
-shell(void){
+shell(int tid){
+    tid = get_current_task_id();
+
     char buf[128] = {0};
     struct Command currentCommand =  {  .cmd = unknown };
 
