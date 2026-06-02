@@ -59,7 +59,7 @@ void gp_fault_handler(uint64_t* stack) {
 
     
     //TODO: need proper task switch to another
-    remove_task(t);
+    remove_task(t->pid);
     //first_task_start();
     //while (1) { __asm__("hlt"); }
     __asm__ volatile("sti");

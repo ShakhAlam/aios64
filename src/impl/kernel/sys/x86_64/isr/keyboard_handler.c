@@ -10,7 +10,7 @@ volatile int scancode_tail = 0;
 
 void keyboard_handler(void* frame) {
     unsigned char scancode = inb(0x60);
-    write_serial(scancode);
+    //write_serial(scancode);
     //return; 
     
     int next = (scancode_head + 1) % SCANCODE_BUFFER_SIZE;

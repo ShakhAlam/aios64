@@ -19,7 +19,12 @@ void timer_handler(void* frame) {
     static int tick =0;
     tick++;
   
+    if(current_task-> quantum > 4)
+        current_task->quantum = 0;
+    current_task->quantum++;
+
     //strprint_serial("\nin timer_handler\n");
-    log_serial(debug,"<timer_handler> invoked: %d\n",tick);
+    log_serial(info,"<timer_handler> invoked: %d %d->%d\n",
+        tick,current_task->pid, current_task->quantum);
     
 }

@@ -41,13 +41,15 @@ struct task {
     uint64_t r13;           // 0x38
     uint64_t r14;           // 0x40
 
+    uint64_t quantum;
+
     // Bookkeeping fields (not touched by switch_task)
     struct task* prev;
     
     int pid;
     int state;
     void (*entry)(void);
-    char name[20];
+    
     
 }; //__attribute((packed));
 

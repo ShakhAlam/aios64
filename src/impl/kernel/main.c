@@ -63,6 +63,8 @@ void clear_back_buffer() {
 
 void page_fault_handler(void* frame, unsigned long error_code) {
     // Read fault address from CR2
+    __asm__ volatile("cli");
+
     uint64_t fault_address;
     __asm__ volatile ("mov %%cr2, %0" : "=r" (fault_address));
 
@@ -86,9 +88,13 @@ void page_fault_handler(void* frame, unsigned long error_code) {
     //The switch to an appropriate next task needs to be
     //synchronized. Need kernel synchronization features.
     //Currenly sync is not in MVP
-    current_task = current_task->next;
-    first_task_start();
 
+    remove_task(t->pid);
+    //current_task = current_task->next;
+    //first_task_start();
+
+    __asm__ volatile("sti");
+    
     //while(1);
     // Halt system
     while (1) {
@@ -129,7 +135,7 @@ void kernel_main(){
     set_idt_entry(13, (uint64_t) isr_gp_fault, 0x8E); // vector 13 = GPF
 
     
-    pic_init_timer(1);   // 100Hz
+    pic_init_timer(100);   // 100Hz
     
     pic_unmask_irq(0); // timer
 

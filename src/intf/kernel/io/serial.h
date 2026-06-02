@@ -10,7 +10,8 @@ typedef enum loglevel{
     error = 1,
     warn = 2,
     info = 3,
-    debug = 4
+    debug = 4,
+    debug_finer = 5
 } loglevel;
 
 

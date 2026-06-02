@@ -6,13 +6,15 @@
 #include "kernel/sys/x86_64/interrupt.h"
 #include "kernel/util/shell.h"
 
+#include "kernel/sys/x86_64/sync/spinlock.h"
+
 void init_alloc(void *heap_start, size_t heap_size);
 void *alloc(size_t size);
 void *memset(void *dest, uint8_t c, size_t n);
 extern int getRIP();
 
 
-static struct task* task_list = 0;
+struct task* task_list = 0;
 struct task *current_task = 0;
 
 struct task*  create_task(void (*func)(), int id);
@@ -36,7 +38,7 @@ void init_tasking(){
     
     //}
     current_task = t1;
-    log_serial(debug,"<init_tasking> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
+    log_serial(debug_finer,"<init_tasking> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
         current_task->pid, current_task->rsp, *((uint64_t*)(current_task->rsp)),
         *((uint64_t*)(current_task->rsp+8))  );
 
@@ -48,7 +50,7 @@ void init_tasking(){
 
 struct task *
 get_current_task(){
-    log_serial(debug,"\n<get_current_task> invoked\n");
+    log_serial(debug_finer,"\n<get_current_task> invoked\n");
 
     return current_task;
 }
@@ -64,10 +66,10 @@ get_current_task_id(){
 struct task *
 get_next_task(){
 
-    log_serial(debug,"\n<get_next_task> invoked\n");
+    log_serial(debug_finer,"\n<get_next_task> invoked\n");
 
     if(!current_task || !current_task->next){
-        log_serial(debug,"<get_next_task> current task or next is null. current: %x next: %x\n", 
+        log_serial(debug_finer,"<get_next_task> current task or next is null. current: %x next: %x\n", 
                    current_task,current_task->next);
         return 0;
     } 
@@ -75,15 +77,15 @@ get_next_task(){
     struct task* next_task = current_task->next;
 
     if(current_task == next_task){
-        log_serial(debug,"\n<get_next_task> - next_task is same\n");
+        log_serial(debug_finer,"\n<get_next_task> - next_task is same\n");
         return 0;    
     }
     
-    log_serial(debug,"<get_next_task> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
+    log_serial(debug_finer,"<get_next_task> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
         current_task->pid, current_task->rsp, *((uint64_t*)(current_task->rsp)),
         *((uint64_t*)(current_task->rsp+8))  );
 
-    log_serial(debug,"<get_next_task> next task id: %d rsp: %x, *rsp=%x\n", 
+    log_serial(debug_finer,"<get_next_task> next task id: %d rsp: %x, *rsp=%x\n", 
             next_task->pid, next_task->rsp, *((uint64_t*)(next_task->rsp)) );
     
     current_task = next_task;
@@ -112,11 +114,11 @@ void schedule(){
     
     strprint_serial("\nin schedule()\n");
 
-    log_serial(debug,"<schd> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
+    log_serial(debug_finer,"<schd> current task id: %d rsp: %x, *rsp=%x, *rsp+8=%x\n", 
         current_task->pid, current_task->rsp, *((uint64_t*)(current_task->rsp)),
         *((uint64_t*)(current_task->rsp+8))  );
 
-    log_serial(debug,"<schd> next task id: %d rsp: %x, *rsp=%x\n", 
+    log_serial(debug_finer,"<schd> next task id: %d rsp: %x, *rsp=%x\n", 
             next_task->pid, next_task->rsp, *((uint64_t*)(next_task->rsp)) );
     
     pic_send_eoi(0);
@@ -125,7 +127,7 @@ void schedule(){
     struct task *prev = current_task;
     current_task = next_task;
     uint64_t rip = getRIP();
-    log_serial(debug,"\nrip = %x\n", rip);
+    log_serial(debug_finer,"\nrip = %x\n", rip);
 
     switch_task(prev,next_task);
     strprint_serial("\nin schedule() after switch_task\n");
@@ -179,9 +181,11 @@ create_task(void (*func)(), int id) {
     t->state = allocated;
     t->rip = func;
 
+    t->quantum = 0;
 
-    log_serial(debug,"created task %d rsp=%x *rsp=%x rip=%x\n",
-        id, t->rsp, *(uint64_t*)t->rsp, t->rip);
+    log_serial(debug_finer,
+        "created task %d rsp=%x *rsp=%x rip=%x quantum=%d\n",
+        id, t->rsp, *(uint64_t*)t->rsp, t->rip,t->quantum);
 
 
     return t;
@@ -219,11 +223,11 @@ create_task(void (*func)(), int id) {
 struct task *
 add_task(struct task* new_task){
 
-    log_serial(debug,"adding task %d rsp=%x *rsp=%x rip=%x\n",
+    log_serial(debug_finer,"adding task %d rsp=%x *rsp=%x rip=%x\n",
         new_task->pid, new_task->rsp, *(uint64_t*)new_task->rsp, new_task->rip);
 
     if(!current_task){
-        log_serial(debug,"current task is null; adding task %d rsp=%x *rsp=%x rip=%x\n",
+        log_serial(debug_finer,"current task is null; adding task %d rsp=%x *rsp=%x rip=%x\n",
             new_task->pid, new_task->rsp, *(uint64_t*)new_task->rsp, new_task->rip);
     
         current_task = new_task;
@@ -258,7 +262,7 @@ find_task(int id){
     struct task *t = 0;
 
     log_serial(info, 
-        "\n<find_task>: %d", id);
+        "\n<find_task>: %d\n", id);
   
     //return 0;
     
@@ -286,9 +290,14 @@ find_task(int id){
     return 0;
 }
 
+static spinlock remove_task_spinlock =0;
 
 struct task * 
 remove_task(int id){
+    __asm__ volatile ("cli");
+            
+    enter_critical_section(&remove_task_spinlock);
+
     log_serial(info,
         "<remove_task>: %d\n", id);
         //return 0;
@@ -299,11 +308,14 @@ remove_task(int id){
     if(t){
          log_serial(info,
             "removing task: %d\n", id);
+
+        print_tasklist();
         
         if(t->prev) {
             log_serial(info,
-                "removing task: %d setting prev->next link. t->prev: %x t->prev->next %x\n", id,
-                t->prev,t->prev?t->prev->next:0);                
+                "removing task: %d setting prev->next link. t->prev: %x t->prev->id : %d t->prev->next %x\n", id,
+                t->prev,t->prev->pid,
+                t->prev?t->prev->next:0);                
             t->prev->next = t->next;
         }else{
             log_serial(info,
@@ -312,8 +324,9 @@ remove_task(int id){
         }
         if(t->next){
             log_serial(info,
-                "removing task: %d setting next->prev link. t->next: %x t->next->prev %x\n", id,
-                t->next,t->prev?t->next->prev:0);                
+                "removing task: %d setting next->prev link. t->next: %x t->next->id : %d t->next->prev %x\n", id,
+                t->next,t->next->pid,
+                t->prev?t->next->prev:0);                
             t->next->prev = t->prev;
         } else{
             log_serial(info,
@@ -325,6 +338,11 @@ remove_task(int id){
             current_task = t->next;
             //TODO: need synchronization to fix
             //issue with overwriting current task in isr_timer
+            
+            print_tasklist();
+            leave_critical_section(&remove_task_spinlock);
+            __asm__ volatile ("sti");
+
             first_task_start();
         }
     }
@@ -333,16 +351,23 @@ remove_task(int id){
                "<remove_task>: returning %d\n", id);
 
     print_tasklist();
+    leave_critical_section(&remove_task_spinlock);
+    __asm__ volatile ("sti");
+            
     return t;
 }
 
 struct task * 
 exit_task(int id){
+    asm volatile ("cli");
+
     struct task * t = remove_task(id);
     if(t){
         printf_serial(debug, "<exit_task> task id: %d\n", t->pid);
         
     }
+    asm volatile ("sti");
+    
     return t;
 }
 
@@ -404,15 +429,15 @@ memset(void *dest, uint8_t c, size_t n){
 void thread1(){
     
     static int counter = 0;
-    log_serial(debug,"<thread1> entered\n");
+    log_serial(debug_finer,"<thread1> entered\n");
     
     //sti();
     while(1){
-        log_serial(debug,"<thread1> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
+        log_serial(debug_finer,"<thread1> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
             current_task->rsp,*((uint64_t*)(current_task->rsp)), 
             current_task->rsp-8, *((uint64_t*)(current_task->rsp -8)) );
 
-        log_serial(debug,"\n--------> 1 : %d\n", counter++);
+        log_serial(debug_finer,"\n--------> 1 : %d\n", counter++);
         asm volatile("hlt");
         //for(volatile uint64_t x =0; x < 0xFFFFFF;x++);
     }
@@ -421,15 +446,15 @@ void thread1(){
 
 void thread2(){
     static int counter = 0;
-    log_serial(debug,"<thread2> entered\n");
+    log_serial(debug_finer,"<thread2> entered\n");
 
     //sti();
     while(1){
-        log_serial(debug,"<thread2> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
+        log_serial(debug_finer,"<thread2> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
             current_task->rsp,*((uint64_t*)(current_task->rsp)), 
             current_task->rsp-8, *((uint64_t*)(current_task->rsp -8)) );
 
-        log_serial(debug,"\n--------> 2 : %d\n", counter++);
+        log_serial(debug_finer,"\n--------> 2 : %d\n", counter++);
         asm volatile("hlt");
         //for(volatile uint64_t x =0; x < 0xFFFFFF;x++);
     }
@@ -439,11 +464,11 @@ void thread3(int tid){
     static int counter = 0;
     //sti();
     /*while(1){
-        log_serial(debug,"<thread3> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
+        log_serial(debug_finer,"<thread3> current task rsp: %x, *rsp: %x, -8: %x, *rsp-8=%x\n", 
             current_task->rsp,*((uint64_t*)(current_task->rsp)), 
             current_task->rsp-8, *((uint64_t*)(current_task->rsp -8)) );
 
-        log_serial(debug,"\n--------> 3 : %d\n", counter++);
+        log_serial(debug_finer,"\n--------> 3 : %d\n", counter++);
         asm volatile("hlt");
         //for(volatile uint64_t x =0; x < 0xFFFFFF;x++);
     }*/

@@ -9,6 +9,9 @@
 #include "kernel/util/shell.h"
 
 #include "kernel/sys/x86_64/scheduler.h"
+
+#include "kernel/sys/x86_64/sync/spinlock.h"
+
 #include "kernel/io/serial.h"
 
 
@@ -33,23 +36,21 @@ struct Command commandsMap[] = {
 
 
 void
-showBuf(int tid){
+showBuf(){
 
-    tid = get_current_task_id();
+    int tid2 = get_current_task_id();
 
-    printf_gfx_term(0xFFFF,0,"Thread Id = %d \n", tid);
+    printf_gfx_term(0xFFFF,0,"Thread Id = %d \n", tid2);
 
     printf_gfx_term(0xFFFF, 0, "Framebuffer address: 0x%x\n", framebuffer_addr);
     printf_gfx_term(0xFFFF, 0, "Backbuffer address: 0x%x\n", back_buffer);
 
-    remove_task(tid);
+    remove_task(tid2);
 }
 
 void drawCos(int tid){
-
-    __asm__ volatile ("cli");
     
-    tid = get_current_task_id();
+    int tid2 = get_current_task_id();
 
     for(int f = 1; f < 50; f++){
 
@@ -67,9 +68,9 @@ void drawCos(int tid){
         //clear_back_buffer();
     }
 
-    remove_task(tid);
+    remove_task(tid2);
 
-    __asm__ volatile("sti");
+
     
 }
 
@@ -78,10 +79,13 @@ clearScreen(){
     //clear_screen(framebuffer_addr,)
 }
 
-void showRegisterCR3(int tid){
-    tid = get_current_task_id();
+static spinlock showRegisterCR3_lock = 0;
 
-    __asm__ volatile ("cli");
+void showRegisterCR3(int tid){
+
+    enter_critical_section(&showRegisterCR3_lock);
+
+    int tid2 = get_current_task_id();
 
     unsigned long cr3 = getCR3();
     printf_gfx_term(0xFFFF,0,"CR3 = %x = PT4\n", cr3);
@@ -110,10 +114,10 @@ void showRegisterCR3(int tid){
     }
 
     printf_gfx_term(0xFFFF00,0,"\n");    
-    remove_task(tid);
-    __asm__ volatile ("sti");
+
+    leave_critical_section(&showRegisterCR3_lock);
     
-    //asm __volatile__ ("hlt");
+    remove_task(tid2);
 
 }
 

@@ -6,9 +6,12 @@ global isr_page_fault
 global isr_gp_fault
 global first_task_start
 
+extern current_task, next_task
+
 extern keyboard_handler, timer_handler, gp_fault_handler, page_fault_handler
 extern strprint_serial
 extern printf_serial
+extern log_serial
 extern get_current_task, get_next_task
 
 section .text
@@ -107,11 +110,30 @@ isr_timer:
     ;push rsp
     pushf
 
+    
 
-    call get_current_task
-    mov rdi, rax
+    push rdi
+    mov rdi, rsp       ; skip over pushed registers 
+    call timer_handler        ; Call C handler
+    pop rdi
+
+
+    mov rdx, [current_task]
+    mov rdx, [rdx+72]
+    mov rdi, 4 ; loglevel 
+    mov rsi, str_dbg_quantum
+    call log_serial
+
+    mov rdx, [current_task]
+    mov rdx, [rdx+72]
+
+    cmp rdx,4 ; check quantum
+    jle out1 
+    
     ; TODO: Save callee-saved registers in struct task
     ; instead of the interrupt stack 
+    mov rdi, [current_task]
+    
     ;mov [rdi + 0x20], rbx
     ;mov [rdi + 0x28], rbp
     ;mov [rdi + 0x30], r12
@@ -119,11 +141,6 @@ isr_timer:
     ;mov [rdi + 0x40], r14
     mov rsi, rsp
     mov [rdi + 0x08], rsi    ; Save current task's rsp in struct task->rsp
-
-    push rdi
-    mov rdi, rsp       ; skip over pushed registers 
-    call timer_handler        ; Call C handler
-    pop rdi
 
 %if 0
         
@@ -137,15 +154,17 @@ isr_timer:
 
 %endif
 first_task_start:
+    cli
     call get_next_task
     mov rsp, [rax+8]
-%if 0  ; print thread stack
-    mov rcx, 18
+%if 1  ; print thread stack
+    mov rcx, 19
 .dump_loop1:
-    mov rdi, str_dbg_stack_entry
-    mov rsi, [rsp+rcx*8]
+    mov rdi, 4 ; loglevel = debug
+    mov rsi, str_dbg_stack_entry
+    mov rdx, [rsp+rcx*8]
     push rcx
-    call printf_serial
+    call log_serial
     pop rcx
     dec rcx
     cmp rcx,0
@@ -160,6 +179,7 @@ first_task_start:
     ;pop rsi
     ;pop rdi
 %endif   
+out1:
 
     ;send ack EOI to PIC
     mov al,0x20
@@ -216,4 +236,5 @@ section .data
     str_task_rflags db "Task RFLAGS: 0x%lx.", 0xa, 0
     str_task_rip db "Task RIP: 0x%lx.", 0xa, 0
     str_current_rip db "Current RIP: 0x%lx.", 0xa, 0
-    str_dbg_stack_entry db "%lx",0xa,0
+    str_dbg_stack_entry db "%lx at rsp + %d * 8",0xa,0
+    str_dbg_quantum db "current_task quantum = %d",0xa,0

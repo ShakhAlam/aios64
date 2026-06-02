@@ -4,7 +4,7 @@
 #include "framebuffer.h"
 #include <stdarg.h>
 
-
+#include "kernel/sys/x86_64/sync/spinlock.h"
 
     // Draw a single character on the screen at position (x, y) with the given color
 
@@ -159,12 +159,16 @@ void printf_gfx(int x, int y, unsigned int color, const char *fmt, ...) {
 static int term_cursor_x = 0;
 static int term_cursor_y = 0;
 
+static spinlock scroll_backbuffer_lock1 = 0;
+
 void scroll_backbuffer(unsigned int *back_buffer,
                        int framebuffer_width,
                        int framebuffer_height,
                        int framebuffer_pitch,
                        int char_height)
 {
+    enter_critical_section(&scroll_backbuffer_lock1);
+
     int rows_to_scroll = 20; //char_height;
     int bytes_per_row = framebuffer_pitch;
 
@@ -189,8 +193,6 @@ void scroll_backbuffer(unsigned int *back_buffer,
         }
     }
     
-
-
     /*
     // Move framebuffer content up
     for (int y = 0; y < framebuffer_height - rows_to_scroll; y++)
@@ -213,6 +215,7 @@ void scroll_backbuffer(unsigned int *back_buffer,
             line[i] = 0;
         }
     }*/
+    leave_critical_section(&scroll_backbuffer_lock1);    
 }
 
 void scroll_backbuffer_1(unsigned char* back_buffer,
@@ -240,7 +243,6 @@ void scroll_backbuffer_1(unsigned char* back_buffer,
     // Clear the last `char_height` lines at the bottom
     /*for (int y = framebuffer_height - rows_to_scroll; y < framebuffer_height; y++) {
         unsigned char* line = back_buffer + y * framebuffer_pitch;
-
         __asm__ __volatile__ (
         "xor %%rax, %%rax\n"
         "rep stosq"
@@ -308,7 +310,7 @@ int vsnprintf(char *buffer, int bufsize, const char *fmt, va_list args) {
     return pos;
 }
 
-
+static spinlock printf_gfx_lock = 0;
 
 void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, ...) {
     static int term_x = 0;
@@ -316,6 +318,8 @@ void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, .
 
     static int prev_term_x = 0;
     static int prev_term_y = 0;
+
+    enter_critical_section(&printf_gfx_lock);
 
     char buf[1024];
     va_list args;
@@ -330,8 +334,7 @@ void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, .
     const int screen_height = 1080;
 
     // Wrap to next line when needed
-    for (const char *p = buf; *p;  p++) {
-        
+    for (const char *p = buf; *p;  p++) {        
         if(*p == 0x8){
             if(term_x >= char_width*2)
                 term_x -= char_width;
@@ -353,7 +356,7 @@ void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, .
 
             if (term_y + char_height >= screen_height) {
                 scroll_backbuffer(framebuffer_addr,framebuffer_width,
-                    framebuffer_height,framebuffer_pitch, char_height);  // Your own scroll function
+                                  framebuffer_height,framebuffer_pitch, char_height);  // Your own scroll function
                 term_y -= char_height;
                 //term_y = 20;
                 //printf_gfx_term(0xFFFFFFFF,"Scrolling!");
@@ -363,6 +366,8 @@ void printf_gfx_term(unsigned int color,unsigned int bgcolor, const char *fmt, .
         }
 
         draw_char(term_x, term_y, *p, color,bgcolor);
-        term_x += char_width;
+        term_x += char_width;    
     }
+
+    leave_critical_section(&printf_gfx_lock);
 }
